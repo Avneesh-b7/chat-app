@@ -1,7 +1,9 @@
 import express from "express";
 import dotenv from "dotenv";
-import { authRouter } from "./routes/auth.routes.ts";
-import { messagesRouter } from "./routes/messages.routes.ts";
+import { authRouter } from "./routes/auth.routes.js";
+import { messagesRouter } from "./routes/messages.routes.js";
+import "./models/user.model.js";
+
 dotenv.config({ path: "./.env" });
 
 const app = express();
