@@ -1,6 +1,7 @@
 import { type Request, type Response } from "express";
 import mongoose from "mongoose";
 import { hashPassword } from "../lib/hashPassword.js";
+import { sendEmail } from "../lib/email/sendEmail.js";
 
 /* -------------------------- REGISTER USER CONTROLLER -------------------------- */
 export async function registerUserController(
@@ -16,8 +17,7 @@ export async function registerUserController(
   const { username, email, password } = req.body;
 
   if (!username || !email || !password) {
-    console.warn("[AUTH] Register validation failed", {
-      username,
+    console.warn("[AUTH] Register validation failed: missing fields", {
       email,
     });
 
@@ -32,7 +32,7 @@ export async function registerUserController(
     typeof email !== "string" ||
     typeof password !== "string"
   ) {
-    console.warn("[AUTH] Register validation failed: invalid types", {
+    console.warn("[AUTH] Register validation failed: invalid field types", {
       usernameType: typeof username,
       emailType: typeof email,
     });
@@ -52,23 +52,44 @@ export async function registerUserController(
     const existingUser = await UserModel.findOne({ email }).lean();
 
     if (existingUser) {
-      console.warn("[AUTH] User already exists", { email });
+      console.warn("[AUTH] Registration conflict: user already exists", {
+        email,
+      });
 
       return res.status(409).json({
         success: false,
         message: "User with this email already exists",
       });
     }
+
     /* -------------------------- PASSWORD HASHING -------------------------- */
     const { hashedPassword } = await hashPassword({ password });
+
     /* ----------------------------- USER CREATE ----------------------------- */
-    await UserModel.create({
+    const createdUser = await UserModel.create({
       username,
       email,
       password: hashedPassword,
     });
 
-    // TODO: send a welcome email to users
+    console.info("[AUTH] User created successfully", {
+      userId: createdUser._id,
+      email,
+    });
+
+    /* ----------------------------- SEND EMAIL ----------------------------- */
+    // Email failure must NOT fail registration
+    sendEmail({
+      to: email,
+      subject: "Welcome to Chat App 🎉",
+      userName: username,
+    }).catch((error: any) => {
+      console.error("[EMAIL] Failed to send welcome email", {
+        userId: createdUser._id,
+        email,
+        message: error?.message,
+      });
+    });
 
     return res.status(201).json({
       success: true,
@@ -77,6 +98,7 @@ export async function registerUserController(
   } catch (error: any) {
     console.error("[AUTH] Failed to register user", {
       message: error?.message,
+      stack: error?.stack,
     });
 
     return res.status(500).json({
