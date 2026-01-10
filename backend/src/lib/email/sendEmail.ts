@@ -26,7 +26,9 @@ export const sendEmail = async (
   const { to, subject, userName } = params;
 
   /* ----------------------------- VALIDATION ----------------------------- */
-  if (!to || typeof to !== "string") {
+  // if (!to || typeof to !== "string") {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!to || typeof to !== "string" || !emailRegex.test(to)) {
     console.warn("[EMAIL] Validation failed: invalid recipient", { to });
     throw new Error("Invalid recipient email");
   }

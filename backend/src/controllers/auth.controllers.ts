@@ -79,17 +79,20 @@ export async function registerUserController(
 
     /* ----------------------------- SEND EMAIL ----------------------------- */
     // Email failure must NOT fail registration
-    sendEmail({
-      to: email,
-      subject: "Welcome to Chat App 🎉",
-      userName: username,
-    }).catch((error: any) => {
+
+    try {
+      await sendEmail({
+        to: email,
+        subject: "Welcome to Chat App 🎉",
+        userName: username,
+      });
+    } catch (error: any) {
       console.error("[EMAIL] Failed to send welcome email", {
         userId: createdUser._id,
         email,
         message: error?.message,
       });
-    });
+    }
 
     return res.status(201).json({
       success: true,

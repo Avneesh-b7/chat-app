@@ -12,8 +12,14 @@ for context here is the resend docs : https://resend.com/docs/send-with-nodejs
 
 import { Resend } from "resend";
 
+let resendClient: Resend | undefined;
+
 /* -------------------------- GET RESEND CLIENT -------------------------- */
 export const getResendClient = (): Resend => {
+  if (resendClient) {
+    return resendClient;
+  }
+
   /* ----------------------------- LOG: ENTRY ----------------------------- */
   console.info("[EMAIL] Initializing Resend client");
 
@@ -24,5 +30,8 @@ export const getResendClient = (): Resend => {
     throw new Error("Email service configuration error");
   }
 
-  return new Resend(apiKey);
+  // return new Resend(apiKey);
+
+  resendClient = new Resend(apiKey);
+  return resendClient;
 };
