@@ -68,6 +68,8 @@ export async function registerUserController(
       password: hashedPassword,
     });
 
+    // TODO: send a welcome email to users
+
     return res.status(201).json({
       success: true,
       message: "User registered successfully",
