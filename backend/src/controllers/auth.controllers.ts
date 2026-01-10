@@ -203,15 +203,6 @@ export async function loginUserController(
       expiresIn: "10m",
     });
 
-    /* ----------------------------- COOKIE ----------------------------- */
-    res.cookie("auth_token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      path: "/",
-      maxAge: 10 * 60 * 1000, // 10 minutes
-    });
-
     /* ----------------------------- RESPONSE USER ----------------------------- */
     const responseUser = {
       id: user._id.toString(),
@@ -222,12 +213,21 @@ export async function loginUserController(
     console.info("[AUTH] Login successful", {
       userId: user._id,
     });
-
-    return res.status(200).json({
-      success: true,
-      message: "Login successful",
-      user: responseUser,
-    });
+    /* ----------------------------- COOKIE & RESPONSE ----------------------------- */
+    return res
+      .status(200)
+      .cookie("auth_token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        path: "/",
+        maxAge: 10 * 60 * 1000, // 10 minutes
+      })
+      .json({
+        success: true,
+        message: "Login successful",
+        user: responseUser,
+      });
   } catch (error: any) {
     console.error("[AUTH] Login failed", {
       message: error?.message,
