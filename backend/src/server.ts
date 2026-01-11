@@ -3,6 +3,7 @@ dotenv.config();
 import express from "express";
 import { connectToDatabase } from "./lib/dbconn.js";
 import { authRouter } from "./routes/auth.routes.js";
+import cookieParser from "cookie-parser";
 import "./models/user.model.js";
 
 /* -------------------------------- ENV SETUP -------------------------------- */
@@ -12,6 +13,7 @@ const app = express();
 
 /* ------------------------------ MIDDLEWARE -------------------------------- */
 app.use(express.json());
+app.use(cookieParser());
 
 /* ------------------------------ START SERVER ------------------------------ */
 const startServer = async (): Promise<void> => {
@@ -49,7 +51,7 @@ const startServer = async (): Promise<void> => {
     });
     process.exit(1);
   }
-
+  /* ----------------------------- ROUTES start ----------------------------- */
   //defining routes
   app.get("/api/v1/health", (_req, res) => {
     res.status(200).json({ status: "ok" });
@@ -59,7 +61,10 @@ const startServer = async (): Promise<void> => {
     res.status(200).json({ status: "welcome to the home page : status ok" });
   });
 
+  // not protected routes
   app.use("/api/v1/auth", authRouter);
+
+  /* ----------------------------- ROUTES end ----------------------------- */
 
   //starts finally
   app.listen(port, () => {
