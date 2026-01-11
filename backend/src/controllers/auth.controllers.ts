@@ -279,3 +279,202 @@ export async function logoutUserController(
     });
   }
 }
+
+/*
+on now lets say i want to give the user the functionality to update his username and password
+
+#TASK
+1. how should i implement this updateUserController() function
+2. how to make it according to industry best practises
+3. follow guidelines as i have given above
+*/
+
+// Updates authenticated user's username and/or password
+// Password updates invalidate the current authentication session
+export async function updateUserController(
+  req: Request,
+  res: Response
+): Promise<Response> {
+  console.info("[USER] updateUserController invoked", {
+    userId: req.user?.id,
+  });
+
+  // Auth middleware guarantees req.user, this is a defensive guard
+  if (!req.user?.id) {
+    return res.status(401).json({
+      success: false,
+      message: "Unauthorized",
+    });
+  }
+
+  const { username, password } = req.body;
+
+  // Reject requests that attempt no actual updates
+  if (!username && !password) {
+    console.warn("[USER] Update failed: no fields provided", {
+      userId: req.user.id,
+    });
+
+    return res.status(400).json({
+      success: false,
+      message: "At least one field must be updated",
+    });
+  }
+
+  // Validate input types early to avoid unsafe updates
+  if (
+    (username && typeof username !== "string") ||
+    (password && typeof password !== "string")
+  ) {
+    console.warn("[USER] Update failed: invalid field types", {
+      userId: req.user.id,
+    });
+
+    return res.status(400).json({
+      success: false,
+      message: "Invalid request payload",
+    });
+  }
+
+  try {
+    const UserModel = mongoose.model("users");
+    const updatePayload: Record<string, any> = {};
+    const isPasswordUpdated = Boolean(password);
+
+    // Prepare username update if provided
+    if (username) {
+      updatePayload.username = username.trim();
+    }
+
+    // Prepare password update with hashing
+    if (password) {
+      const { hashedPassword } = await hashPassword({ password });
+      updatePayload.password = hashedPassword;
+    }
+
+    // Apply atomic update scoped to authenticated user
+    const updatedUser = await UserModel.findByIdAndUpdate(
+      req.user.id,
+      { $set: updatePayload },
+      { new: true }
+    ).lean();
+
+    if (!updatedUser) {
+      console.error("[USER] Update failed: user not found", {
+        userId: req.user.id,
+      });
+
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Invalidate auth session if password was changed
+    if (isPasswordUpdated) {
+      res.clearCookie("auth_token", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        path: "/",
+      });
+
+      console.info("[USER] Password updated, session invalidated", {
+        userId: req.user.id,
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: "Password updated. Please login again.",
+      });
+    }
+
+    console.info("[USER] User updated successfully", {
+      userId: req.user.id,
+      fieldsUpdated: Object.keys(updatePayload),
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "User updated successfully",
+    });
+  } catch (error: any) {
+    console.error("[USER] Failed to update user", {
+      userId: req.user?.id,
+      message: error?.message,
+    });
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update user",
+    });
+  }
+}
+
+// Returns the currently authenticated user's profile
+// Relies on auth middleware to populate req.user
+export async function meController(
+  req: Request,
+  res: Response
+): Promise<Response> {
+  console.info("[AUTH] meController invoked", {
+    userId: req.user?.id,
+  });
+
+  // Auth middleware guarantees req.user; this is a defensive guard
+  if (!req.user?.id) {
+    return res.status(401).json({
+      success: false,
+      message: "Unauthorized",
+    });
+  }
+
+  try {
+    const UserModel = mongoose.model("users");
+
+    // Fetch fresh user data to avoid relying on stale token claims
+    type LeanUser = {
+      _id: string;
+      username: string;
+      email: string;
+    };
+
+    const user = await UserModel.findById(req.user.id)
+      .select("_id username email")
+      .lean<LeanUser>();
+
+    if (!user) {
+      console.error("[AUTH] Authenticated user not found", {
+        userId: req.user.id,
+      });
+
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    console.info("[AUTH] Current user fetched successfully", {
+      userId: user._id,
+    });
+
+    return res.status(200).json({
+      success: true,
+      user: {
+        id: user._id.toString(),
+        username: user.username,
+        email: user.email,
+      },
+    });
+  } catch (error: any) {
+    console.error("[AUTH] Failed to fetch current user", {
+      userId: req.user?.id,
+      message: error?.message,
+    });
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch user",
+    });
+  }
+}
