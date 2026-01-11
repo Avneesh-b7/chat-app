@@ -356,7 +356,8 @@ export async function updateUserController(
     const updatedUser = await UserModel.findByIdAndUpdate(
       req.user.id,
       { $set: updatePayload },
-      { new: true }
+      // { new: true }
+      { new: true, runValidators: true, context: "query" }
     ).lean();
 
     if (!updatedUser) {

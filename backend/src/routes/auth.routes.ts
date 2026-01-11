@@ -13,8 +13,8 @@ export const authRouter = express.Router();
 // not protected routes
 authRouter.post("/register", registerUserController);
 authRouter.post("/login", loginUserController);
-authRouter.post("/logout", logoutUserController);
 
 // protected routes
 authRouter.put("/update-user", authMiddleware, updateUserController);
 authRouter.get("/me", authMiddleware, meController);
+authRouter.post("/logout", authMiddleware, logoutUserController);
