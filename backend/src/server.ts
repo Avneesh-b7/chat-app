@@ -1,10 +1,13 @@
 import dotenv from "dotenv";
+
 dotenv.config();
+
 import express from "express";
 import { connectToDatabase } from "./lib/dbconn.js";
 import { authRouter } from "./routes/auth.routes.js";
 import cookieParser from "cookie-parser";
 import "./models/user.model.js";
+import "./lib/arcjet.js";
 
 /* -------------------------------- ENV SETUP -------------------------------- */
 
@@ -12,6 +15,7 @@ import "./models/user.model.js";
 const app = express();
 
 /* ------------------------------ MIDDLEWARE -------------------------------- */
+
 app.use(express.json());
 app.use(cookieParser());
 
