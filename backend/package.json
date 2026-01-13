@@ -12,6 +12,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@arcjet/inspect": "^1.0.0-beta.16",
+    "@arcjet/node": "^1.0.0-beta.16",
     "@types/cookie-parser": "^1.4.10",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",

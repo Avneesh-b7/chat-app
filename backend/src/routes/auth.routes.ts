@@ -7,14 +7,25 @@ import {
   meController,
 } from "../controllers/auth.controllers.js";
 import { authMiddleware } from "../middlewares/auth.middleware.js";
+import { arcjetMiddleware } from "../middlewares/arcjet.middleware.js";
 
 export const authRouter = express.Router();
 
 // not protected routes
-authRouter.post("/register", registerUserController);
-authRouter.post("/login", loginUserController);
+authRouter.post("/register", arcjetMiddleware, registerUserController);
+authRouter.post("/login", arcjetMiddleware, loginUserController);
 
 // protected routes
-authRouter.put("/update-user", authMiddleware, updateUserController);
-authRouter.get("/me", authMiddleware, meController);
-authRouter.post("/logout", authMiddleware, logoutUserController);
+authRouter.put(
+  "/update-user",
+  arcjetMiddleware,
+  authMiddleware,
+  updateUserController
+);
+authRouter.get("/me", arcjetMiddleware, authMiddleware, meController);
+authRouter.post(
+  "/logout",
+  arcjetMiddleware,
+  authMiddleware,
+  logoutUserController
+);
