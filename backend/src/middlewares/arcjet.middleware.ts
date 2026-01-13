@@ -5,7 +5,15 @@ import { aj } from "../lib/arcjet.js";
 // Adapts Express request into Arcjet's required request shape
 // Guarantees presence of remoteAddress for strict type safety
 const toArcjetRequest = (req: Request): ArcjetNodeRequest => {
-  const remoteAddress = req.ip || req.socket.remoteAddress || "0.0.0.0";
+  //   const remoteAddress = req.ip || req.socket.remoteAddress || "0.0.0.0";
+
+  const remoteAddress = req.ip || req.socket.remoteAddress;
+
+  if (!remoteAddress) {
+    // Throwing an error here will be caught by the middleware's try/catch
+    // and result in a "fail closed" 403 response.
+    throw new Error("Could not determine remote address for request.");
+  }
 
   return {
     method: req.method,
