@@ -6,6 +6,8 @@ From now on, whenever I ask you to generate a backend function, follow this exac
 
 ## TECH STACK
 
+socket.io, node.js, typescript, resend to send emails , zustand, react , mongo db , mongoose
+
 ## STYLE + QUALITY RULES
 
 - Always produce **production-grade Node.js backend code**.
