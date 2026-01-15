@@ -54,7 +54,7 @@ messageSchema.pre("validate", function () {
 });
 
 /* ----------------------------- MODEL INIT ----------------------------- */
-const MessageModel =
-  mongoose.models.Message || mongoose.model<IMessage>("Message", messageSchema);
+const MessageModel = (mongoose.models.Message ||
+  mongoose.model<IMessage>("Message", messageSchema)) as mongoose.Model<IMessage>;
 
 export default MessageModel;
