@@ -5,6 +5,7 @@ dotenv.config();
 import express from "express";
 import { connectToDatabase } from "./lib/dbconn.js";
 import { authRouter } from "./routes/auth.routes.js";
+import { messagesRouter } from "./routes/message.routes.js";
 import cookieParser from "cookie-parser";
 import "./models/user.model.js";
 import "./lib/arcjet.js";
@@ -65,8 +66,8 @@ const startServer = async (): Promise<void> => {
     res.status(200).json({ status: "welcome to the home page : status ok" });
   });
 
-  // not protected routes
   app.use("/api/v1/auth", authRouter);
+  app.use("/api/v1/messages", messagesRouter);
 
   /* ----------------------------- ROUTES end ----------------------------- */
 

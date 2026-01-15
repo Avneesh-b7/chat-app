@@ -1,4 +1,13 @@
-import mongoose, { Schema } from "mongoose";
+import mongoose, { Schema, Model } from "mongoose";
+import { Types } from "mongoose";
+
+export interface IUser {
+  _id: Types.ObjectId;
+  username: string;
+  email: string;
+  password: string;
+  createdAt: Date;
+}
 
 /* ----------------------------- USER SCHEMA ----------------------------- */
 const userSchema = new Schema(
@@ -57,4 +66,12 @@ userSchema.pre("save", async function () {
 });
 
 /* ----------------------------- MODEL INIT ----------------------------- */
-mongoose.models.users || mongoose.model("users", userSchema);
+
+// const UserModel = mongoose.models.users || mongoose.model("users", userSchema);
+
+// export default UserModel;
+
+const UserModel: Model<IUser> =
+  mongoose.models.users || mongoose.model<IUser>("users", userSchema);
+
+export default UserModel;
