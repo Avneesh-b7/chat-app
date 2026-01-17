@@ -6,12 +6,14 @@ import {
   sendMessage,
 } from "../controllers/messages.controllers.js";
 import { authMiddleware } from "../middlewares/auth.middleware.js";
+import { arcjetMiddleware } from "../middlewares/arcjet.middleware.js";
 
 export const messagesRouter = express.Router();
 
-// all are protected routes
-messagesRouter.get("/all-contacts", authMiddleware, getAllContacts);
-messagesRouter.get("/chat-contacts", authMiddleware, getChatContacts);
-messagesRouter.get("/:id", authMiddleware, getMessagesByUserId);
+messagesRouter.use(arcjetMiddleware, authMiddleware);
 
-messagesRouter.post("/send/:id", authMiddleware, sendMessage);
+// all are protected routes
+messagesRouter.get("/all-contacts", getAllContacts);
+messagesRouter.get("/chat-contacts", getChatContacts);
+messagesRouter.get("/:id", getMessagesByUserId);
+messagesRouter.post("/send/:id", sendMessage);
