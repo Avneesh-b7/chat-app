@@ -24,8 +24,9 @@ function App() {
 
         {/* Protected routes */}
         <Route
-          path="/chat"
-          element={isAuthenticated ? <ChatPage /> : <Navigate to="/login" />}
+          path="/chats"
+          // element={isAuthenticated ? <ChatPage /> : <Navigate to="/login" />}
+          element={<ChatPage />} //temp fix to test
         />
 
         {/* Catch all - redirect to home */}
