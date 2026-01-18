@@ -3,10 +3,13 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import express from "express";
+import { createServer } from "http";
+import cors from "cors";
 import { connectToDatabase } from "./lib/dbconn.js";
 import { authRouter } from "./routes/auth.routes.js";
 import { messagesRouter } from "./routes/message.routes.js";
 import cookieParser from "cookie-parser";
+import { initializeSocketIO } from "./lib/socket.js";
 import "./models/user.model.js";
 import "./lib/arcjet.js";
 
@@ -16,6 +19,16 @@ import "./lib/arcjet.js";
 const app = express();
 
 /* ------------------------------ MIDDLEWARE -------------------------------- */
+
+// CORS configuration
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    credentials: true, // Allow cookies
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
 app.use(express.json());
 app.use(cookieParser());
@@ -72,11 +85,15 @@ const startServer = async (): Promise<void> => {
   /* ----------------------------- ROUTES end ----------------------------- */
 
   //starts finally
-  app.listen(port, () => {
+  const httpServer = createServer(app);
+  initializeSocketIO(httpServer);
+
+  httpServer.listen(port, () => {
     console.info("[SERVER] Express server listening", {
       port,
       environment,
     });
+    console.info("[STARTUP] Socket.IO enabled");
   });
 };
 

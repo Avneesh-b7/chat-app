@@ -6,7 +6,8 @@ import { create } from "zustand";
 //   - Placeholder logic: Ready for API integration later (marked with TODO comments)
 
 interface User {
-  id: string;
+  _id: string; // Using _id to match MongoDB convention
+  id: string; // Keep for backward compatibility
   email: string;
   username: string;
   profilePic?: string;
@@ -50,18 +51,31 @@ export const useAuthStore = create<AuthState>((set) => ({
   login: async (email: string, password: string) => {
     set({ isLoading: true, error: null });
     try {
-      // TODO: Implement API call to /api/v1/auth/login
-      // For now, just placeholder
-      console.log("Login:", email, password);
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/v1/auth/login`, {
+        method: 'POST',
+        credentials: 'include', // Send/receive cookies
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-      // Simulated response - replace with actual API call later
-      const mockUser: User = {
-        id: "1",
-        email,
-        username: "user",
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Login failed');
+      }
+
+      // Map backend user to frontend user format
+      const user: User = {
+        _id: data.user.id,
+        id: data.user.id,
+        email: data.user.email,
+        username: data.user.username,
       };
 
-      set({ user: mockUser, isAuthenticated: true, isLoading: false });
+      set({ user, isAuthenticated: true, isLoading: false });
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : "Login failed",
@@ -73,17 +87,49 @@ export const useAuthStore = create<AuthState>((set) => ({
   register: async (email: string, username: string, password: string) => {
     set({ isLoading: true, error: null });
     try {
-      // TODO: Implement API call to /api/v1/auth/register
-      console.log("Register:", email, username, password);
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-      // Simulated response - replace with actual API call later
-      const mockUser: User = {
-        id: "1",
-        email,
-        username,
+      // Step 1: Register the user
+      const registerResponse = await fetch(`${apiUrl}/api/v1/auth/register`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, username, password }),
+      });
+
+      const registerData = await registerResponse.json();
+
+      if (!registerResponse.ok) {
+        throw new Error(registerData.message || 'Registration failed');
+      }
+
+      // Step 2: Automatically login after successful registration
+      const loginResponse = await fetch(`${apiUrl}/api/v1/auth/login`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const loginData = await loginResponse.json();
+
+      if (!loginResponse.ok) {
+        throw new Error('Registration succeeded but login failed. Please login manually.');
+      }
+
+      // Map backend user to frontend user format
+      const user: User = {
+        _id: loginData.user.id,
+        id: loginData.user.id,
+        email: loginData.user.email,
+        username: loginData.user.username,
       };
 
-      set({ user: mockUser, isAuthenticated: true, isLoading: false });
+      set({ user, isAuthenticated: true, isLoading: false });
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : "Registration failed",
@@ -95,12 +141,22 @@ export const useAuthStore = create<AuthState>((set) => ({
   logout: async () => {
     set({ isLoading: true, error: null });
     try {
-      // TODO: Implement API call to /api/v1/auth/logout
-      console.log("Logout");
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/v1/auth/logout`, {
+        method: 'POST',
+        credentials: 'include', // Send cookies
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
+      // Always clear user state, even if API call fails (API always returns success)
       set({ user: null, isAuthenticated: false, isLoading: false });
     } catch (error) {
+      // Clear user state even on error to ensure client can logout
       set({
+        user: null,
+        isAuthenticated: false,
         error: error instanceof Error ? error.message : "Logout failed",
         isLoading: false,
       });
@@ -110,11 +166,32 @@ export const useAuthStore = create<AuthState>((set) => ({
   checkAuth: async () => {
     set({ isLoading: true, error: null });
     try {
-      // TODO: Implement API call to /api/v1/auth/me
-      console.log("Check auth");
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/v1/auth/me`, {
+        method: 'GET',
+        credentials: 'include', // Send cookies
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-      // For now, assume not authenticated
-      set({ user: null, isAuthenticated: false, isLoading: false });
+      if (!response.ok) {
+        // Not authenticated (401) or user not found (404)
+        set({ user: null, isAuthenticated: false, isLoading: false });
+        return;
+      }
+
+      const data = await response.json();
+
+      // Map backend user to frontend user format
+      const user: User = {
+        _id: data.user.id,
+        id: data.user.id,
+        email: data.user.email,
+        username: data.user.username,
+      };
+
+      set({ user, isAuthenticated: true, isLoading: false });
     } catch (error) {
       set({
         user: null,

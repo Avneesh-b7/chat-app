@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useChatStore } from "../store/chatStore";
 import { useAuthStore } from "../store/authStore";
+import { useSocket } from "../hooks/useSocket";
+import { socketService } from "../lib/socket";
 
 type TabType = "messages" | "contacts";
 
@@ -10,6 +12,7 @@ const ChatPage = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { user: currentUser } = useAuthStore();
+  const { isConnected } = useSocket();
   const {
     messages,
     chatContacts,
@@ -17,13 +20,24 @@ const ChatPage = () => {
     selectedUser,
     isLoading,
     error,
+    onlineUsers,
+    typingUsers,
+    messageDeliveryStatus,
     getChatContacts,
     getAllContacts,
     getMessages,
     sendMessage,
     setSelectedUser,
     clearError,
+    initializeSocketListeners,
+    cleanupSocketListeners,
   } = useChatStore();
+
+  // Initialize socket listeners
+  useEffect(() => {
+    initializeSocketListeners();
+    return () => cleanupSocketListeners();
+  }, [initializeSocketListeners, cleanupSocketListeners]);
 
   // Fetch appropriate contacts based on active tab
   useEffect(() => {
@@ -46,6 +60,22 @@ const ChatPage = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Send read receipts when viewing messages
+  useEffect(() => {
+    if (selectedUser && messages.length > 0) {
+      // Mark messages as read
+      const unreadMessages = messages.filter(
+        (m) =>
+          m.senderId === selectedUser._id &&
+          messageDeliveryStatus.get(m._id) !== "read",
+      );
+
+      unreadMessages.forEach((msg) => {
+        socketService.emit("messageRead", { messageId: msg._id });
+      });
+    }
+  }, [messages, selectedUser, messageDeliveryStatus]);
+
   const handleUserSelect = (user: (typeof chatContacts)[0]) => {
     setSelectedUser(user);
     clearError();
@@ -58,13 +88,60 @@ const ChatPage = () => {
 
     await sendMessage(selectedUser._id, messageText);
     setMessageText("");
+
+    // Clear typing indicator after sending
+    if (selectedUser) {
+      socketService.emit("typing", {
+        receiverId: selectedUser._id,
+        isTyping: false,
+      });
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setMessageText(value);
+
+    // Emit typing status
+    if (selectedUser) {
+      socketService.emit("typing", {
+        receiverId: selectedUser._id,
+        isTyping: value.length > 0,
+      });
+    }
+  };
+
+  const handleInputBlur = () => {
+    // Clear typing on blur
+    if (selectedUser) {
+      socketService.emit("typing", {
+        receiverId: selectedUser._id,
+        isTyping: false,
+      });
+    }
   };
 
   // Get current users list based on active tab
   const currentUsers = activeTab === "messages" ? chatContacts : allContacts;
 
+  // Get typing status for selected user
+  const isTyping = selectedUser ? typingUsers.get(selectedUser._id) : false;
+
+  // Get message delivery status helper
+  const getMessageStatus = (messageId: string) => {
+    return messageDeliveryStatus.get(messageId) || "sent";
+  };
+
   return (
     <div className="h-screen flex bg-slate-800">
+      {/* Connection Status Indicator */}
+      {!isConnected && (
+        <div className="fixed top-4 right-4 bg-yellow-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 z-50">
+          <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+          <span>Reconnecting...</span>
+        </div>
+      )}
+
       {/* Left Sidebar - User List */}
       <div className="w-80 bg-slate-900 border-r border-slate-700 flex flex-col shadow-xl">
         {/* Sidebar Header with Current User Profile */}
@@ -167,6 +244,10 @@ const ChatPage = () => {
                     <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold shadow-lg">
                       {user.username.charAt(0).toUpperCase()}
                     </div>
+                    {/* Online status indicator */}
+                    {onlineUsers.has(user._id) && (
+                      <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-slate-900" />
+                    )}
                   </div>
 
                   {/* User info */}
@@ -174,6 +255,9 @@ const ChatPage = () => {
                     <p className="font-semibold text-white truncate">
                       {user.username}
                     </p>
+                    {onlineUsers.has(user._id) && (
+                      <p className="text-xs text-green-400">Online</p>
+                    )}
                   </div>
 
                   {/* Selection indicator */}
@@ -197,11 +281,20 @@ const ChatPage = () => {
                 <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold shadow-md">
                   {selectedUser.username.charAt(0).toUpperCase()}
                 </div>
+                {/* Online status indicator */}
+                {onlineUsers.has(selectedUser._id) && (
+                  <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-slate-900" />
+                )}
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold text-white text-lg">
                   {selectedUser.username}
                 </h3>
+                {onlineUsers.has(selectedUser._id) ? (
+                  <p className="text-sm text-green-400">Online</p>
+                ) : (
+                  <p className="text-sm text-slate-400">Offline</p>
+                )}
               </div>
             </div>
 
@@ -251,25 +344,47 @@ const ChatPage = () => {
                               className="mt-2 rounded-lg max-w-full"
                             />
                           )}
-                          <p
-                            className={`text-xs mt-1.5 ${
-                              isOwnMessage ? "text-blue-200" : "text-slate-400"
-                            }`}
-                          >
-                            {new Date(message.createdAt).toLocaleTimeString(
-                              [],
-                              {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              }
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <p
+                              className={`text-xs ${
+                                isOwnMessage
+                                  ? "text-blue-200"
+                                  : "text-slate-400"
+                              }`}
+                            >
+                              {new Date(message.createdAt).toLocaleTimeString(
+                                [],
+                                {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                },
+                              )}
+                            </p>
+                            {/* Message delivery status (only for own messages) */}
+                            {isOwnMessage && (
+                              <span className="text-xs text-blue-200">
+                                {getMessageStatus(message._id) === "read" &&
+                                  "✓✓ Read"}
+                                {getMessageStatus(message._id) ===
+                                  "delivered" && "✓✓"}
+                                {getMessageStatus(message._id) === "sent" &&
+                                  "✓"}
+                              </span>
                             )}
-                          </p>
+                          </div>
                         </div>
                       </div>
                     );
                   })}
                   <div ref={messagesEndRef} />
                 </>
+              )}
+
+              {/* Typing Indicator */}
+              {isTyping && (
+                <div className="px-4 py-2 text-sm text-slate-400 italic animate-pulse">
+                  {selectedUser.username} is typing...
+                </div>
               )}
             </div>
 
@@ -279,9 +394,10 @@ const ChatPage = () => {
                 <input
                   type="text"
                   value={messageText}
-                  onChange={(e) => setMessageText(e.target.value)}
+                  onChange={handleInputChange}
+                  onBlur={handleInputBlur}
                   placeholder="Type a message..."
-                  className="flex-1 px-4 py-3 bg-slate-800 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500  
+                  className="flex-1 px-4 py-3 bg-slate-800 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500
   focus:border-transparent caret-white transition-all duration-200"
                 />
                 <button

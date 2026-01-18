@@ -2,6 +2,7 @@ import { type Request, type Response } from "express";
 import mongoose from "mongoose";
 import UserModel from "../models/user.model.js";
 import MessageModel from "../models/message.model.js";
+import { getIO, getSocketIdByUserId } from "../lib/socket.js";
 
 /**
  * GET /messages/all-contacts
@@ -52,7 +53,7 @@ export async function getAllContacts(req: Request, res: Response) {
       {
         password: 0,
         email: 0,
-      }
+      },
     )
       .sort({ createdAt: -1 })
       .lean();
@@ -169,7 +170,7 @@ export async function getChatContacts(req: Request, res: Response) {
     /* ----------------------------- USER FETCH ----------------------------- */
     const contacts = await UserModel.find(
       { _id: { $in: contactIds } },
-      { password: 0, email: 0 }
+      { password: 0, email: 0 },
     )
       .sort({ createdAt: -1 })
       .lean();
@@ -463,6 +464,51 @@ export async function sendMessage(req: Request, res: Response) {
       requestId,
       messageId: newMessage._id,
     });
+
+    /* ----------------------------- SOCKET.IO BROADCAST ----------------------------- */
+    try {
+      const io = getIO();
+      const receiverSocketId = getSocketIdByUserId(receiverId);
+
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit("receiveMessage", {
+          // _id: newMessage._id.toString(),
+          // senderId: newMessage.senderId.toString(),
+          // receiverId: newMessage.receiverId.toString(),
+          // text: newMessage.text,
+          // image: newMessage.image,
+          // createdAt: newMessage.createdAt.toISOString(),
+          // updatedAt: newMessage.updatedAt.toISOString(),
+          _id: newMessage._id.toString(),
+          senderId: newMessage.senderId.toString(),
+          receiverId: newMessage.receiverId.toString(),
+          createdAt: newMessage.createdAt.toISOString(),
+          updatedAt: newMessage.updatedAt.toISOString(),
+          ...(newMessage.text ? { text: newMessage.text } : {}),
+          ...(newMessage.image ? { image: newMessage.image } : {}),
+        });
+
+        console.info("[sendMessage] Message broadcast via Socket.IO", {
+          requestId,
+          messageId: newMessage._id.toString(),
+          receiverId,
+        });
+      } else {
+        console.info(
+          "[sendMessage] Receiver not online, message saved for later",
+          {
+            requestId,
+            receiverId,
+          },
+        );
+      }
+    } catch (error) {
+      // Log but don't fail the request - message is already saved
+      console.error("[sendMessage] Socket.IO broadcast failed", {
+        requestId,
+        error: error instanceof Error ? error.message : "Unknown",
+      });
+    }
 
     /* ----------------------------- RESPONSE ----------------------------- */
     return res.status(201).json({
